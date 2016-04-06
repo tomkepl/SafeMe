@@ -75,6 +75,15 @@ namespace SaveMe
 			// aapt resource value: 0x7f050004
 			public const int textView4 = 2131034116;
 			
+			// aapt resource value: 0x7f050005
+			public const int textView5 = 2131034117;
+			
+			// aapt resource value: 0x7f050006
+			public const int textView6 = 2131034118;
+			
+			// aapt resource value: 0x7f050007
+			public const int textView7 = 2131034119;
+			
 			static Id()
 			{
 				global::Android.Runtime.ResourceIdManager.UpdateIdValues();

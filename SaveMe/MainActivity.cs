@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -14,6 +15,7 @@ using Android.Widget;
 using Android.OS;
 using Android.Telephony;
 using Android.Util;
+using Environment = System.Environment;
 
 namespace SaveMe
 {
@@ -121,6 +123,21 @@ namespace SaveMe
                 _roaming.Text = "No";
                 _isOnline.Text = "No";
             }
+
+            //string path = Environment.GetFolderPath(Environment.SpecialFolder.Personal);
+            //string filename = Path.Combine(path, "myfile.txt");
+            //File.Delete(filename);
+
+            //using (var streamWriter = new StreamWriter(filename, true))
+            //{
+            //    streamWriter.WriteLine(DateTime.UtcNow);
+            //}
+
+            //using (var streamReader = new StreamReader(filename))
+            //{
+            //    string content = streamReader.ReadToEnd();
+            //    System.Diagnostics.Debug.WriteLine(content);
+            //}
         }
 
         void HandleSignalStrengthChanged(int strength)

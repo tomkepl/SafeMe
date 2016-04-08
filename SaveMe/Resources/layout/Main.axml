@@ -19,7 +19,7 @@
         android:textAppearance="?android:attr/textAppearanceSmall"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:id="@+id/textView2" />
+        android:id="@+id/textViewAcc" />
     <TextView
         android:text="GYR"
         android:textAppearance="?android:attr/textAppearanceSmall"
@@ -31,7 +31,7 @@
         android:textAppearance="?android:attr/textAppearanceSmall"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:id="@+id/textView4" />
+        android:id="@+id/textViewGyr" />
     <TextView
         android:text="GPS"
         android:textAppearance="?android:attr/textAppearanceSmall"
@@ -43,11 +43,76 @@
         android:textAppearance="?android:attr/textAppearanceSmall"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:id="@+id/textView6" />
+        android:id="@+id/textViewGps" />
     <TextView
         android:text="GPS Address"
         android:textAppearance="?android:attr/textAppearanceSmall"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:id="@+id/textView7" />
+        android:id="@+id/textViewGpsAdress" />
+    <TextView
+        android:text="GSM Signal Strength"
+        android:textAppearance="?android:attr/textAppearanceSmall"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/textViewGsm"
+        android:layout_marginRight="0.0dp" />
+    <ImageView
+        android:id="@+id/imageView1"
+        android:src="@drawable/gsm_signal_strength"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="0.0dp" />
+    <TableRow
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/tableRow1">
+        <TextView
+            android:text="Is Online"
+            android:id="@+id/textView9"
+            android:layout_width="200dp" />
+        <TextView
+            android:text="No"
+            android:id="@+id/textViewIsOnline"
+            android:layout_column="1" />
+    </TableRow>
+    <TableRow
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/tableRow2">
+        <TextView
+            android:text="WiFi"
+            android:id="@+id/textView10"
+            android:layout_width="200dp" />
+        <TextView
+            android:text="No"
+            android:id="@+id/textViewWiFi"
+            android:layout_column="1" />
+    </TableRow>
+    <TableRow
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/tableRow3">
+        <TextView
+            android:text="Roaming"
+            android:id="@+id/textView11"
+            android:layout_width="200dp" />
+        <TextView
+            android:text="No"
+            android:id="@+id/textViewRoaming"
+            android:layout_column="1" />
+    </TableRow>
+    <TableRow
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/tableRow4">
+        <TextView
+            android:text="Connection Type"
+            android:id="@+id/textView12"
+            android:layout_width="200dp" />
+        <TextView
+            android:text="Connection Type Results"
+            android:id="@+id/textViewConnectionType"
+            android:layout_column="1" />
+    </TableRow>
 </LinearLayout>

@@ -7,11 +7,13 @@ using Android.App;
 using Android.Content;
 using Android.Hardware;
 using Android.Locations;
+using Android.Net;
 using Android.Runtime;
 using Android.Views;
 using Android.Widget;
 using Android.OS;
 using Android.Telephony;
+using Android.Util;
 
 namespace SaveMe
 {
@@ -19,17 +21,27 @@ namespace SaveMe
     public class MainActivity : Activity, ISensorEventListener, ILocationListener
     {
         static readonly object _syncLock = new object();
+        string _locationProvider;
         Location _currentLocation;
         LocationManager _locationManager;
-        string _locationProvider;
-
+        
         SensorManager _sensorManagerAcc;
         SensorManager _sensorManagerGir;
+
+        TelephonyManager _telephonyManager;
+        GsmSignalStrengthListener _signalStrengthListener;
 
         TextView _sensorTextViewAcc;
         TextView _sensorTextViewGir;
         TextView _locationText;
         TextView _addressText;
+        TextView _gmsStrengthTextView;
+        ImageView _gmsStrengthImageView;
+
+        TextView _isOnline;
+        TextView _roaming;
+        TextView _wifi;
+        TextView _connectionType;
 
         protected override void OnCreate(Bundle bundle)
         {
@@ -42,10 +54,16 @@ namespace SaveMe
             // and attach an event to it
             Button button = FindViewById<Button>(Resource.Id.MyButton);
             button.Click += delegate { StartSensors(); };
-            _sensorTextViewAcc = FindViewById<TextView>(Resource.Id.textView2);
-            _sensorTextViewGir = FindViewById<TextView>(Resource.Id.textView4);
-            _locationText = FindViewById<TextView>(Resource.Id.textView6);
-            _addressText = FindViewById<TextView>(Resource.Id.textView7);
+            _sensorTextViewAcc = FindViewById<TextView>(Resource.Id.textViewAcc);
+            _sensorTextViewGir = FindViewById<TextView>(Resource.Id.textViewGyr);
+            _locationText = FindViewById<TextView>(Resource.Id.textViewGps);
+            _addressText = FindViewById<TextView>(Resource.Id.textViewGpsAdress);
+            _gmsStrengthTextView = FindViewById<TextView>(Resource.Id.textViewGsm);
+            _gmsStrengthImageView = FindViewById<ImageView>(Resource.Id.imageView1);
+            _wifi = FindViewById<TextView>(Resource.Id.textViewWiFi);
+            _roaming = FindViewById<TextView>(Resource.Id.textViewRoaming);
+            _isOnline = FindViewById<TextView>(Resource.Id.textViewIsOnline);
+            _connectionType = FindViewById<TextView>(Resource.Id.textViewConnectionType);
         }
 
         private void StartSensors()
@@ -66,7 +84,54 @@ namespace SaveMe
 
             InitializeLocationManager();
             _locationManager?.RequestLocationUpdates(_locationProvider, 0, 0, this);
+
+            _telephonyManager = (TelephonyManager)GetSystemService(Context.TelephonyService);
+            _signalStrengthListener = new GsmSignalStrengthListener();
+            _telephonyManager.Listen(_signalStrengthListener, PhoneStateListenerFlags.SignalStrengths);
+            _signalStrengthListener.SignalStrengthChanged += HandleSignalStrengthChanged;
+
+            DetectNetwork();
             //TODO stop if started (toggle)
+        }
+
+        private void DetectNetwork()
+        {
+            ConnectivityManager connectivityManager = (ConnectivityManager)GetSystemService(ConnectivityService);
+            NetworkInfo activeConnection = connectivityManager.ActiveNetworkInfo;
+
+            bool isOnline = (activeConnection != null) && activeConnection.IsConnected;
+
+            if (isOnline)
+            {
+                _isOnline.Text = "Yes";
+
+                NetworkInfo.State activeState = activeConnection.GetState();
+                _connectionType.Text = activeConnection.TypeName;
+
+                NetworkInfo wifiInfo = connectivityManager.GetNetworkInfo(ConnectivityType.Wifi);
+                _wifi.Text = wifiInfo.IsConnected ? "Yes" : "No";
+
+                NetworkInfo mobileInfo = connectivityManager.GetNetworkInfo(ConnectivityType.Mobile);
+                _roaming.Text = mobileInfo.IsRoaming && mobileInfo.IsConnected ? "Yes" : "No";
+            }
+            else
+            {
+                _connectionType.Text = "N/A";
+                _wifi.Text = "No";
+                _roaming.Text = "No";
+                _isOnline.Text = "No";
+            }
+        }
+
+        void HandleSignalStrengthChanged(int strength)
+        {
+            // We want this to be a one-shot thing when the button is pushed. Make sure to unhook everything
+            _signalStrengthListener.SignalStrengthChanged -= HandleSignalStrengthChanged;
+            _telephonyManager.Listen(_signalStrengthListener, PhoneStateListenerFlags.None);
+
+            // Update the UI with text and an image.
+            _gmsStrengthImageView.SetImageLevel(strength);
+            _gmsStrengthTextView.Text = $"GSM Signal Strength ({strength}):";
         }
 
         void InitializeLocationManager()
@@ -106,6 +171,8 @@ namespace SaveMe
         protected override void OnResume()
         {
             base.OnResume();
+            DetectNetwork();
+
             if (_sensorManagerAcc != null && _sensorManagerGir != null && _locationManager != null)
             {
                 //TODO sprawdzac czy dzialaja na wzbudzeniu, jesli nie obudzic

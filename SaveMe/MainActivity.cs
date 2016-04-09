@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Android.App;
 using Android.Content;
@@ -46,6 +48,10 @@ namespace SaveMe
         TextView _roaming;
         TextView _wifi;
         TextView _connectionType;
+
+        private string _lastDateTime;
+        private string _pathToDatabase;
+        private bool _dbok = false;
 
         protected override void OnCreate(Bundle bundle)
         {
@@ -148,29 +154,38 @@ namespace SaveMe
             Button button = FindViewById<Button>(Resource.Id.MyButton);
             var context = button.Context;
             var docsFolder = Android.OS.Environment.ExternalStorageDirectory.AbsolutePath;
-            var pathToDatabase = Path.Combine(docsFolder, "db_tomke.db");
+            _pathToDatabase = Path.Combine(docsFolder, "db_tomke.db");
 
             try
             {
-                SqliteConnection.CreateFile(pathToDatabase);
-                var connectionString = $"Data Source={pathToDatabase};Version=3;";
-                try
+                if (File.Exists(_pathToDatabase) == false)
                 {
-                    using (var conn = new SqliteConnection((connectionString)))
+                    SqliteConnection.CreateFile(_pathToDatabase);
+
+                    var connectionString = $"Data Source={_pathToDatabase};Version=3;";
+                    try
                     {
-                        await conn.OpenAsync();
-                        using (var command = conn.CreateCommand())
+                        using (var conn = new SqliteConnection((connectionString)))
                         {
-                            command.CommandText = "CREATE TABLE Log (Id INTEGER PRIMARY KEY AUTOINCREMENT, Sensor ntext, Value ntext)";
-                            command.CommandType = CommandType.Text;
-                            await command.ExecuteNonQueryAsync();
+                            await conn.OpenAsync();
+                            using (var command = conn.CreateCommand())
+                            {
+                                command.CommandText =
+                                    "CREATE TABLE Log (Id INTEGER PRIMARY KEY AUTOINCREMENT, Sensor ntext, Value ntext, Time ntext)";
+                                command.CommandType = CommandType.Text;
+                                await command.ExecuteNonQueryAsync();
+                            }
                         }
                     }
+                    catch (Exception ex)
+                    {
+                        var reason = $"Failed to insert into the database - reason = {ex.Message}";
+                        Toast.MakeText(context, reason, ToastLength.Long).Show();
+                    }
                 }
-                catch (Exception ex)
+                else
                 {
-                    var reason = $"Failed to insert into the database - reason = {ex.Message}";
-                    Toast.MakeText(context, reason, ToastLength.Long).Show();
+                    Toast.MakeText(context, "DB_TOMKE exist", ToastLength.Long).Show();
                 }
             }
             catch (IOException ex)
@@ -209,7 +224,7 @@ namespace SaveMe
             // We don't want to do anything here.
         }
 
-        public void OnSensorChanged(SensorEvent e)
+        public async void OnSensorChanged(SensorEvent e)
         {
             lock (_syncLock)
             {
@@ -220,8 +235,43 @@ namespace SaveMe
                 if (e.Sensor.Type == SensorType.Gyroscope)
                 {
                     _sensorTextViewGir.Text = $"x={e.Values[0]:f}, y={e.Values[1]:f}, y={e.Values[2]:f}";
-                }
+                }                
+            }
 
+            if (DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") != _lastDateTime)
+            {
+                var time = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                await InsertIntoDb(_sensorTextViewAcc.Text, time, "ACC");
+                await InsertIntoDb(_sensorTextViewGir.Text, time, "GYR");
+                await InsertIntoDb(_locationText.Text, time, "GPS");
+                _lastDateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            }
+        }
+
+        private async Task InsertIntoDb(string _value, string time, string sensor)
+        {
+            if (_dbok == true || File.Exists(_pathToDatabase))
+            {
+                _dbok = true;
+                var connectionString = $"Data Source={_pathToDatabase};Version=3;";
+                try
+                {
+                    using (var conn = new SqliteConnection((connectionString)))
+                    {
+                        await conn.OpenAsync();
+                        using (var command = conn.CreateCommand())
+                        {
+                            command.CommandText =
+                                $"INSERT INTO Log (Sensor,Value,Time) VALUES('{sensor}', '{_value}', '{time}')";
+                            command.CommandType = CommandType.Text;
+                            await command.ExecuteNonQueryAsync();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ;
+                }
             }
         }
 

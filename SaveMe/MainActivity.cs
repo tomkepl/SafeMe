@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -15,6 +16,7 @@ using Android.Widget;
 using Android.OS;
 using Android.Telephony;
 using Android.Util;
+using Mono.Data.Sqlite;
 using Environment = System.Environment;
 
 namespace SaveMe
@@ -93,6 +95,7 @@ namespace SaveMe
             _signalStrengthListener.SignalStrengthChanged += HandleSignalStrengthChanged;
 
             DetectNetwork();
+            CreateDatabase();
             //TODO stop if started (toggle)
         }
 
@@ -139,6 +142,43 @@ namespace SaveMe
             //    System.Diagnostics.Debug.WriteLine(content);
             //}
         }
+
+        private async void CreateDatabase()
+        {
+            Button button = FindViewById<Button>(Resource.Id.MyButton);
+            var context = button.Context;
+            var docsFolder = Android.OS.Environment.ExternalStorageDirectory.AbsolutePath;
+            var pathToDatabase = Path.Combine(docsFolder, "db_tomke.db");
+
+            try
+            {
+                SqliteConnection.CreateFile(pathToDatabase);
+                var connectionString = $"Data Source={pathToDatabase};Version=3;";
+                try
+                {
+                    using (var conn = new SqliteConnection((connectionString)))
+                    {
+                        await conn.OpenAsync();
+                        using (var command = conn.CreateCommand())
+                        {
+                            command.CommandText = "CREATE TABLE Log (Id INTEGER PRIMARY KEY AUTOINCREMENT, Sensor ntext, Value ntext)";
+                            command.CommandType = CommandType.Text;
+                            await command.ExecuteNonQueryAsync();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    var reason = $"Failed to insert into the database - reason = {ex.Message}";
+                    Toast.MakeText(context, reason, ToastLength.Long).Show();
+                }
+            }
+            catch (IOException ex)
+            {
+                var reason = $"Unable to create the database - reason = {ex.Message}";
+                Toast.MakeText(context, reason, ToastLength.Long).Show();
+            }
+        }    
 
         void HandleSignalStrengthChanged(int strength)
         {

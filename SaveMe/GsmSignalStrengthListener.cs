@@ -4,7 +4,7 @@ namespace SaveMe
 {
     public class GsmSignalStrengthListener : PhoneStateListener
     {
-        public delegate void SignalStrengthChangedDelegate(int strength);
+        public delegate void SignalStrengthChangedDelegate(int strength, int level);
 
         public event SignalStrengthChangedDelegate SignalStrengthChanged;
 
@@ -12,10 +12,7 @@ namespace SaveMe
         {
             if (newSignalStrength.IsGsm)
             {
-                if (SignalStrengthChanged != null)
-                {
-                    SignalStrengthChanged(newSignalStrength.GsmSignalStrength);
-                }
+                SignalStrengthChanged?.Invoke(newSignalStrength.GsmSignalStrength, newSignalStrength.Level);
             }
         }
     }

@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Android.App;
 using Android.Content;
+using Android.Content.PM;
 using Android.Hardware;
 using Android.Locations;
 using Android.Net;
@@ -23,9 +24,10 @@ using Environment = System.Environment;
 
 namespace SaveMe
 {
-    [Activity(Label = "SaveMe", MainLauncher = true, Icon = "@drawable/icon")]
+    [Activity(Label = "SaveMe", MainLauncher = true, Icon = "@drawable/icon", ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize)]
     public class MainActivity : Activity, ISensorEventListener, ILocationListener
     {
+        #region private fields
         static readonly object _syncLock = new object();
         string _locationProvider;
         Location _currentLocation;
@@ -51,7 +53,8 @@ namespace SaveMe
 
         private string _lastDateTime;
         private string _pathToDatabase;
-        private bool _dbok = false;
+        private OkFlag _dbok = new OkFlag() {Ok = false};
+        #endregion
 
         protected override void OnCreate(Bundle bundle)
         {
@@ -101,7 +104,7 @@ namespace SaveMe
             _signalStrengthListener.SignalStrengthChanged += HandleSignalStrengthChanged;
 
             DetectNetwork();
-            CreateDatabase();
+            AdoFunctionsHelper.CreateDatabase(FindViewById<Button>(Resource.Id.MyButton).Context);
             //TODO stop if started (toggle)
         }
 
@@ -132,78 +135,30 @@ namespace SaveMe
                 _roaming.Text = "No";
                 _isOnline.Text = "No";
             }
-
-            //string path = Environment.GetFolderPath(Environment.SpecialFolder.Personal);
-            //string filename = Path.Combine(path, "myfile.txt");
-            //File.Delete(filename);
-
-            //using (var streamWriter = new StreamWriter(filename, true))
-            //{
-            //    streamWriter.WriteLine(DateTime.UtcNow);
-            //}
-
-            //using (var streamReader = new StreamReader(filename))
-            //{
-            //    string content = streamReader.ReadToEnd();
-            //    System.Diagnostics.Debug.WriteLine(content);
-            //}
         }
 
-        private async void CreateDatabase()
-        {
-            Button button = FindViewById<Button>(Resource.Id.MyButton);
-            var context = button.Context;
-            var docsFolder = Android.OS.Environment.ExternalStorageDirectory.AbsolutePath;
-            _pathToDatabase = Path.Combine(docsFolder, "db_tomke.db");
-
-            try
-            {
-                if (File.Exists(_pathToDatabase) == false)
-                {
-                    SqliteConnection.CreateFile(_pathToDatabase);
-
-                    var connectionString = $"Data Source={_pathToDatabase};Version=3;";
-                    try
-                    {
-                        using (var conn = new SqliteConnection((connectionString)))
-                        {
-                            await conn.OpenAsync();
-                            using (var command = conn.CreateCommand())
-                            {
-                                command.CommandText =
-                                    "CREATE TABLE Log (Id INTEGER PRIMARY KEY AUTOINCREMENT, Sensor ntext, Value ntext, Time ntext)";
-                                command.CommandType = CommandType.Text;
-                                await command.ExecuteNonQueryAsync();
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        var reason = $"Failed to insert into the database - reason = {ex.Message}";
-                        Toast.MakeText(context, reason, ToastLength.Long).Show();
-                    }
-                }
-                else
-                {
-                    Toast.MakeText(context, "DB_TOMKE exist", ToastLength.Long).Show();
-                }
-            }
-            catch (IOException ex)
-            {
-                var reason = $"Unable to create the database - reason = {ex.Message}";
-                Toast.MakeText(context, reason, ToastLength.Long).Show();
-            }
-        }    
-
-        void HandleSignalStrengthChanged(int strength)
+        
+        void HandleSignalStrengthChanged(int strength, int level)
         {
             // We want this to be a one-shot thing when the button is pushed. Make sure to unhook everything
-            _signalStrengthListener.SignalStrengthChanged -= HandleSignalStrengthChanged;
-            _telephonyManager.Listen(_signalStrengthListener, PhoneStateListenerFlags.None);
+            //_signalStrengthListener.SignalStrengthChanged -= HandleSignalStrengthChanged;
+            //_telephonyManager.Listen(_signalStrengthListener, PhoneStateListenerFlags.None);
 
             // Update the UI with text and an image.
-            _gmsStrengthImageView.SetImageLevel(strength);
-            _gmsStrengthTextView.Text = $"GSM Signal Strength ({strength}):";
+            var temp = strength;
+            if (strength == 99)
+            {
+                if (level < 1)
+                    temp = 0;
+                if (level >= 1 && level < 3)
+                    temp = 1;
+                if (level >= 3 && level < 5)
+                    temp = 10;
+                if (level >= 5)
+                    temp = 20;
+            }
+            _gmsStrengthImageView.SetImageLevel(temp);
+            _gmsStrengthTextView.Text = $"GSM Signal Strength ({temp}):";
         }
 
         void InitializeLocationManager()
@@ -241,40 +196,14 @@ namespace SaveMe
             if (DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") != _lastDateTime)
             {
                 var time = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                await InsertIntoDb(_sensorTextViewAcc.Text, time, "ACC");
-                await InsertIntoDb(_sensorTextViewGir.Text, time, "GYR");
-                await InsertIntoDb(_locationText.Text, time, "GPS");
+                await AdoFunctionsHelper.InsertIntoDb(_sensorTextViewAcc.Text, time, "ACC", _dbok);
+                await AdoFunctionsHelper.InsertIntoDb(_sensorTextViewGir.Text, time, "GYR", _dbok);
+                await AdoFunctionsHelper.InsertIntoDb(_locationText.Text, time, "GPS", _dbok);
                 _lastDateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
             }
         }
 
-        private async Task InsertIntoDb(string _value, string time, string sensor)
-        {
-            if (_dbok == true || File.Exists(_pathToDatabase))
-            {
-                _dbok = true;
-                var connectionString = $"Data Source={_pathToDatabase};Version=3;";
-                try
-                {
-                    using (var conn = new SqliteConnection((connectionString)))
-                    {
-                        await conn.OpenAsync();
-                        using (var command = conn.CreateCommand())
-                        {
-                            command.CommandText =
-                                $"INSERT INTO Log (Sensor,Value,Time) VALUES('{sensor}', '{_value}', '{time}')";
-                            command.CommandType = CommandType.Text;
-                            await command.ExecuteNonQueryAsync();
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    ;
-                }
-            }
-        }
-
+        
         protected override void OnResume()
         {
             base.OnResume();

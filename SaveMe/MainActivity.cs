@@ -28,6 +28,9 @@ namespace SaveMe
     public class MainActivity : Activity, ISensorEventListener, ILocationListener
     {
         #region private fields
+
+        private Context _context;
+
         static readonly object _syncLock = new object();
         string _locationProvider;
         Location _currentLocation;
@@ -35,16 +38,14 @@ namespace SaveMe
         
         SensorManager _sensorManagerAcc;
         SensorManager _sensorManagerGir;
-
-        TelephonyManager _telephonyManager;
-        GsmSignalStrengthListener _signalStrengthListener;
-
+        private GsmHelper _gsmHelper;
+        
         TextView _sensorTextViewAcc;
         TextView _sensorTextViewGir;
         TextView _locationText;
         TextView _addressText;
-        TextView _gmsStrengthTextView;
-        ImageView _gmsStrengthImageView;
+        TextView _gsmStrengthTextView;
+        ImageView _gsmStrengthImageView;
 
         TextView _isOnline;
         TextView _roaming;
@@ -71,12 +72,16 @@ namespace SaveMe
             _sensorTextViewGir = FindViewById<TextView>(Resource.Id.textViewGyr);
             _locationText = FindViewById<TextView>(Resource.Id.textViewGps);
             _addressText = FindViewById<TextView>(Resource.Id.textViewGpsAdress);
-            _gmsStrengthTextView = FindViewById<TextView>(Resource.Id.textViewGsm);
-            _gmsStrengthImageView = FindViewById<ImageView>(Resource.Id.imageView1);
+            _gsmStrengthTextView = FindViewById<TextView>(Resource.Id.textViewGsm);
+            _gsmStrengthImageView = FindViewById<ImageView>(Resource.Id.imageView1);
             _wifi = FindViewById<TextView>(Resource.Id.textViewWiFi);
             _roaming = FindViewById<TextView>(Resource.Id.textViewRoaming);
             _isOnline = FindViewById<TextView>(Resource.Id.textViewIsOnline);
             _connectionType = FindViewById<TextView>(Resource.Id.textViewConnectionType);
+            _context = FindViewById<Button>(Resource.Id.MyButton).Context;
+
+            _gsmHelper = new GsmHelper(_context, _gsmStrengthImageView, _gsmStrengthTextView);
+            AdoFunctionsHelper.CreateDatabase(_context);
         }
 
         private void StartSensors()
@@ -98,67 +103,9 @@ namespace SaveMe
             InitializeLocationManager();
             _locationManager?.RequestLocationUpdates(_locationProvider, 0, 0, this);
 
-            _telephonyManager = (TelephonyManager)GetSystemService(Context.TelephonyService);
-            _signalStrengthListener = new GsmSignalStrengthListener();
-            _telephonyManager.Listen(_signalStrengthListener, PhoneStateListenerFlags.SignalStrengths);
-            _signalStrengthListener.SignalStrengthChanged += HandleSignalStrengthChanged;
-
-            DetectNetwork();
-            AdoFunctionsHelper.CreateDatabase(FindViewById<Button>(Resource.Id.MyButton).Context);
+            _gsmHelper.Start();
+            NetworkHelper.DetectNetwork(_context, _isOnline, _connectionType, _wifi, _roaming);
             //TODO stop if started (toggle)
-        }
-
-        private void DetectNetwork()
-        {
-            ConnectivityManager connectivityManager = (ConnectivityManager)GetSystemService(ConnectivityService);
-            NetworkInfo activeConnection = connectivityManager.ActiveNetworkInfo;
-
-            bool isOnline = (activeConnection != null) && activeConnection.IsConnected;
-
-            if (isOnline)
-            {
-                _isOnline.Text = "Yes";
-
-                NetworkInfo.State activeState = activeConnection.GetState();
-                _connectionType.Text = activeConnection.TypeName;
-
-                NetworkInfo wifiInfo = connectivityManager.GetNetworkInfo(ConnectivityType.Wifi);
-                _wifi.Text = wifiInfo.IsConnected ? "Yes" : "No";
-
-                NetworkInfo mobileInfo = connectivityManager.GetNetworkInfo(ConnectivityType.Mobile);
-                _roaming.Text = mobileInfo.IsRoaming && mobileInfo.IsConnected ? "Yes" : "No";
-            }
-            else
-            {
-                _connectionType.Text = "N/A";
-                _wifi.Text = "No";
-                _roaming.Text = "No";
-                _isOnline.Text = "No";
-            }
-        }
-
-        
-        void HandleSignalStrengthChanged(int strength, int level)
-        {
-            // We want this to be a one-shot thing when the button is pushed. Make sure to unhook everything
-            //_signalStrengthListener.SignalStrengthChanged -= HandleSignalStrengthChanged;
-            //_telephonyManager.Listen(_signalStrengthListener, PhoneStateListenerFlags.None);
-
-            // Update the UI with text and an image.
-            var temp = strength;
-            if (strength == 99)
-            {
-                if (level < 1)
-                    temp = 0;
-                if (level >= 1 && level < 3)
-                    temp = 1;
-                if (level >= 3 && level < 5)
-                    temp = 10;
-                if (level >= 5)
-                    temp = 20;
-            }
-            _gmsStrengthImageView.SetImageLevel(temp);
-            _gmsStrengthTextView.Text = $"GSM Signal Strength ({temp}):";
         }
 
         void InitializeLocationManager()
@@ -207,7 +154,7 @@ namespace SaveMe
         protected override void OnResume()
         {
             base.OnResume();
-            DetectNetwork();
+            NetworkHelper.DetectNetwork(_context, _isOnline, _connectionType, _wifi, _roaming);
 
             if (_sensorManagerAcc != null && _sensorManagerGir != null && _locationManager != null)
             {
@@ -289,22 +236,7 @@ namespace SaveMe
         public void OnStatusChanged(string provider, Availability status, Bundle extras)
         {
             ;
-        }
-
-        private void SendSms(string number, string content, bool intent = false)
-        {
-            if (intent == false)
-            {
-                SmsManager.Default.SendTextMessage(number, null, content, null, null);
-            }
-            else
-            {
-                var smsUri = Android.Net.Uri.Parse("smsto:" + number);
-                var smsIntent = new Intent(Intent.ActionSendto, smsUri);
-                smsIntent.PutExtra("sms_body", content);
-                StartActivity(smsIntent);
-            }
-        }
+        }       
     }
 }
 

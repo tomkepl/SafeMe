@@ -52,10 +52,13 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AdoFunctionsHelper.cs" />
+    <Compile Include="GsmHelper.cs" />
     <Compile Include="GsmSignalStrengthListener.cs" />
     <Compile Include="MainActivity.cs" />
+    <Compile Include="NetworkHelper.cs" />
     <Compile Include="Resources\Resource.Designer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="SmsHelper.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="GettingStarted.Xamarin" />

@@ -25,19 +25,16 @@ using Environment = System.Environment;
 namespace SaveMe
 {
     [Activity(Label = "SaveMe", MainLauncher = true, Icon = "@drawable/icon", ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize)]
-    public class MainActivity : Activity, ISensorEventListener, ILocationListener
+    public class MainActivity : Activity, ILocationListener, ISensorEventListener
     {
         #region private fields
 
         private Context _context;
 
         static readonly object _syncLock = new object();
-        string _locationProvider;
-        Location _currentLocation;
-        LocationManager _locationManager;
-        
-        SensorManager _sensorManagerAcc;
-        SensorManager _sensorManagerGir;
+
+        private DoubleSensorHelper _sensorHelper;
+        private GpsHelper _gpsHelper;
         private GsmHelper _gsmHelper;
         
         TextView _sensorTextViewAcc;
@@ -53,21 +50,18 @@ namespace SaveMe
         TextView _connectionType;
 
         private string _lastDateTime;
-        private string _pathToDatabase;
         private OkFlag _dbok = new OkFlag() {Ok = false};
         #endregion
 
+        #region Activity ovverride
         protected override void OnCreate(Bundle bundle)
         {
             base.OnCreate(bundle);
 
-            // Set our view from the "main" layout resource
             SetContentView(Resource.Layout.Main);
 
-            // Get our button from the layout resource,
-            // and attach an event to it
             Button button = FindViewById<Button>(Resource.Id.MyButton);
-            button.Click += delegate { StartSensors(); };
+            button.Click += delegate { Start(); };
             _sensorTextViewAcc = FindViewById<TextView>(Resource.Id.textViewAcc);
             _sensorTextViewGir = FindViewById<TextView>(Resource.Id.textViewGyr);
             _locationText = FindViewById<TextView>(Resource.Id.textViewGps);
@@ -80,47 +74,39 @@ namespace SaveMe
             _connectionType = FindViewById<TextView>(Resource.Id.textViewConnectionType);
             _context = FindViewById<Button>(Resource.Id.MyButton).Context;
 
+            _sensorHelper = new DoubleSensorHelper(_context, this);
             _gsmHelper = new GsmHelper(_context, _gsmStrengthImageView, _gsmStrengthTextView);
+            _gpsHelper = new GpsHelper(_context, _locationText, _addressText, this);
+
             AdoFunctionsHelper.CreateDatabase(_context);
+            NetworkHelper.DetectNetwork(_context, _isOnline, _connectionType, _wifi, _roaming);
         }
 
-        private void StartSensors()
+        protected override void OnResume()
         {
-            if (_sensorManagerAcc == null && _sensorManagerGir == null)
-            {
-                _sensorManagerAcc = (SensorManager) GetSystemService(SensorService);
-                _sensorManagerGir = (SensorManager) GetSystemService(SensorService);
-                if (_sensorManagerAcc != null && _sensorManagerGir != null)
-                {
-                    _sensorManagerAcc.RegisterListener(this,
-                        _sensorManagerAcc.GetDefaultSensor(SensorType.Accelerometer),
-                        SensorDelay.Fastest);
-                    _sensorManagerGir.RegisterListener(this, _sensorManagerGir.GetDefaultSensor(SensorType.Gyroscope),
-                        SensorDelay.Fastest);
-                }
-            }
+            base.OnResume();
 
-            InitializeLocationManager();
-            _locationManager?.RequestLocationUpdates(_locationProvider, 0, 0, this);
+            //NetworkHelper.DetectNetwork(_context, _isOnline, _connectionType, _wifi, _roaming);
+            //_sensorHelper.Resume();
+        }
 
-            _gsmHelper.Start();
-            NetworkHelper.DetectNetwork(_context, _isOnline, _connectionType, _wifi, _roaming);
+        protected override void OnPause()
+        {
+            base.OnPause();
+
+            //_sensorHelper.Pause();
+        }
+        #endregion
+
+        private void Start()
+        {            
+            _sensorHelper.Start();
+            _gpsHelper.InitializeLocationManager();            
+            _gsmHelper.Start();            
             //TODO stop if started (toggle)
         }
 
-        void InitializeLocationManager()
-        {
-            //TODO zrobic poziom sygnalu i czy jest juz ustalona pozycja
-            _locationManager = (LocationManager)GetSystemService(LocationService);
-            Criteria criteriaForLocationService = new Criteria
-            {
-                Accuracy = Accuracy.Fine
-            };
-            IList<string> acceptableLocationProviders = _locationManager.GetProviders(criteriaForLocationService, true);
-
-            _locationProvider = acceptableLocationProviders.Any() ? acceptableLocationProviders.First() : string.Empty;
-        }
-
+        #region ISensorEventListener
         public void OnAccuracyChanged(Sensor sensor, SensorStatus accuracy)
         {
             // We don't want to do anything here.
@@ -143,84 +129,18 @@ namespace SaveMe
             if (DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") != _lastDateTime)
             {
                 var time = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                _lastDateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                 await AdoFunctionsHelper.InsertIntoDb(_sensorTextViewAcc.Text, time, "ACC", _dbok);
                 await AdoFunctionsHelper.InsertIntoDb(_sensorTextViewGir.Text, time, "GYR", _dbok);
-                await AdoFunctionsHelper.InsertIntoDb(_locationText.Text, time, "GPS", _dbok);
-                _lastDateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                await AdoFunctionsHelper.InsertIntoDb(_locationText.Text, time, "GPS", _dbok);               
             }
         }
+        #endregion
 
-        
-        protected override void OnResume()
+        #region ILocationListener
+        public void OnLocationChanged(Location location)
         {
-            base.OnResume();
-            NetworkHelper.DetectNetwork(_context, _isOnline, _connectionType, _wifi, _roaming);
-
-            if (_sensorManagerAcc != null && _sensorManagerGir != null && _locationManager != null)
-            {
-                //TODO sprawdzac czy dzialaja na wzbudzeniu, jesli nie obudzic
-                _sensorManagerAcc.RegisterListener(this, _sensorManagerAcc.GetDefaultSensor(SensorType.Accelerometer),
-                    SensorDelay.Fastest);
-                _sensorManagerGir.RegisterListener(this, _sensorManagerGir.GetDefaultSensor(SensorType.Gyroscope),
-                    SensorDelay.Fastest);
-
-                _locationManager.RequestLocationUpdates(_locationProvider, 0, 0, this);
-            }
-        }
-
-        protected override void OnPause()
-        {
-            base.OnPause();
-            if (_sensorManagerAcc != null && _sensorManagerGir != null && _locationManager != null)
-            {
-                //TODO to chyba spowoduje w uspieniu brak dzialania to teoretycznie do usuniecia
-                _sensorManagerAcc.UnregisterListener(this);
-                _sensorManagerGir.UnregisterListener(this);
-                _locationManager.RemoveUpdates(this);
-            }
-        }
-
-        async Task<Address> ReverseGeocodeCurrentLocation()
-        {
-            Geocoder geocoder = new Geocoder(this);
-            IList<Address> addressList =
-                await geocoder.GetFromLocationAsync(_currentLocation.Latitude, _currentLocation.Longitude, 10);
-
-            Address address = addressList.FirstOrDefault();
-            return address;
-        }
-
-        void DisplayAddress(Address address)
-        {
-            if (address != null)
-            {
-                StringBuilder deviceAddress = new StringBuilder();
-                for (int i = 0; i < address.MaxAddressLineIndex; i++)
-                {
-                    deviceAddress.AppendLine(address.GetAddressLine(i));
-                }
-                // Remove the last comma from the end of the address.
-                _addressText.Text = deviceAddress.ToString();                
-            }
-            else
-            {
-                _addressText.Text = "Unable to determine the address. Try again in a few minutes.";
-            }
-        }
-
-        public async void OnLocationChanged(Location location)
-        {
-            _currentLocation = location;
-            if (_currentLocation == null)
-            {
-                _locationText.Text = "Unable to determine your location. Try again in a short while.";
-            }
-            else
-            {
-                _locationText.Text = $"{_currentLocation.Latitude:f6},{_currentLocation.Longitude:f6}";
-                Address address = await ReverseGeocodeCurrentLocation();
-                DisplayAddress(address);                
-            }
+            ;
         }
 
         public void OnProviderDisabled(string provider)
@@ -236,7 +156,8 @@ namespace SaveMe
         public void OnStatusChanged(string provider, Availability status, Bundle extras)
         {
             ;
-        }       
+        }
+        #endregion        
     }
 }
 

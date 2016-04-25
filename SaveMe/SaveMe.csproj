@@ -52,6 +52,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AdoFunctionsHelper.cs" />
+    <Compile Include="DoubleSensorHelper.cs" />
+    <Compile Include="GpsHelper.cs" />
     <Compile Include="GsmHelper.cs" />
     <Compile Include="GsmSignalStrengthListener.cs" />
     <Compile Include="MainActivity.cs" />

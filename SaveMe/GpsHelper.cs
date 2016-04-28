@@ -21,15 +21,17 @@ namespace SaveMe
 
         private TextView _addressText;
         private Context _context;
+        private TextView _gpsState;
         private TextView _locationText;
         private MainActivity _activity;
 
-        public GpsHelper(Context _context, TextView _locationText, TextView _addressText, MainActivity activity)
+        public GpsHelper(Context _context, TextView _locationText, TextView _addressText, TextView _gpsState, MainActivity activity)
         {
             this._context = _context;
             this._locationText = _locationText;
             this._addressText = _addressText;
             this._activity = activity;
+            this._gpsState = _gpsState;
         }
 
         public void InitializeLocationManager()
@@ -71,8 +73,8 @@ namespace SaveMe
                 {
                     deviceAddress.AppendLine(address.GetAddressLine(i));
                 }
-                // Remove the last comma from the end of the address.
-                _addressText.Text = deviceAddress.ToString();
+                
+                _addressText.Text = "Last determined address : " + deviceAddress.ToString();
             }
             else
             {
@@ -93,6 +95,11 @@ namespace SaveMe
                 Address address = await ReverseGeocodeCurrentLocation();
                 DisplayAddress(address);
             }
+        }
+
+        public void OnStatusChanged(string provider, bool enabled)
+        {
+            _gpsState.Text = enabled ? "GPS Available" : "GPS Unavailable";
         }
     }
 }

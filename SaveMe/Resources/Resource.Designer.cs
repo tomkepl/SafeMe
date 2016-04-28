@@ -108,9 +108,6 @@ namespace SaveMe
 			// aapt resource value: 0x7f050003
 			public const int textView3 = 2131034115;
 			
-			// aapt resource value: 0x7f050005
-			public const int textView5 = 2131034117;
-			
 			// aapt resource value: 0x7f05000b
 			public const int textView9 = 2131034123;
 			
@@ -119,6 +116,9 @@ namespace SaveMe
 			
 			// aapt resource value: 0x7f050015
 			public const int textViewConnectionType = 2131034133;
+			
+			// aapt resource value: 0x7f050005
+			public const int textViewGPSState = 2131034117;
 			
 			// aapt resource value: 0x7f050006
 			public const int textViewGps = 2131034118;

@@ -38,13 +38,16 @@ namespace SaveMe
                     _sensorManagerGir.RegisterListener(activity, _sensorManagerGir.GetDefaultSensor(SensorType.Gyroscope), SensorDelay.Fastest);
                 }
             }
+            else
+            {
+                this.Resume();
+            }
         }
 
         public void Resume()
         {
             if (_sensorManagerAcc != null && _sensorManagerGir != null)
             {
-                //TODO sprawdzac czy dzialaja na wzbudzeniu, jesli nie obudzic
                 _sensorManagerAcc.RegisterListener(activity, _sensorManagerAcc.GetDefaultSensor(SensorType.Accelerometer), SensorDelay.Fastest);
                 _sensorManagerGir.RegisterListener(activity, _sensorManagerGir.GetDefaultSensor(SensorType.Gyroscope), SensorDelay.Fastest);
             }
@@ -54,7 +57,6 @@ namespace SaveMe
         {
             if (_sensorManagerAcc != null && _sensorManagerGir != null)
             {
-                //TODO to chyba spowoduje w uspieniu brak dzialania to teoretycznie do usuniecia
                 _sensorManagerAcc.UnregisterListener(activity);
                 _sensorManagerGir.UnregisterListener(activity);
             }

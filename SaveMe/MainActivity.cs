@@ -29,6 +29,7 @@ namespace SaveMe
     {
         #region private fields
 
+        private bool _started = false;
         private Context _context;
 
         static readonly object _syncLock = new object();
@@ -41,6 +42,7 @@ namespace SaveMe
         TextView _sensorTextViewGir;
         TextView _locationText;
         TextView _addressText;
+        TextView _gpsState;
         TextView _gsmStrengthTextView;
         ImageView _gsmStrengthImageView;
 
@@ -48,6 +50,7 @@ namespace SaveMe
         TextView _roaming;
         TextView _wifi;
         TextView _connectionType;
+        private Button _button;
 
         private string _lastDateTime;
         private OkFlag _dbok = new OkFlag() {Ok = false};
@@ -60,10 +63,11 @@ namespace SaveMe
 
             SetContentView(Resource.Layout.Main);
 
-            Button button = FindViewById<Button>(Resource.Id.MyButton);
-            button.Click += delegate { Start(); };
+            _button = FindViewById<Button>(Resource.Id.MyButton);
+            _button.Click += delegate { Start(); };
             _sensorTextViewAcc = FindViewById<TextView>(Resource.Id.textViewAcc);
             _sensorTextViewGir = FindViewById<TextView>(Resource.Id.textViewGyr);
+            _gpsState = FindViewById<TextView>(Resource.Id.textViewGPSState);
             _locationText = FindViewById<TextView>(Resource.Id.textViewGps);
             _addressText = FindViewById<TextView>(Resource.Id.textViewGpsAdress);
             _gsmStrengthTextView = FindViewById<TextView>(Resource.Id.textViewGsm);
@@ -76,7 +80,7 @@ namespace SaveMe
 
             _sensorHelper = new DoubleSensorHelper(_context, this);
             _gsmHelper = new GsmHelper(_context, _gsmStrengthImageView, _gsmStrengthTextView);
-            _gpsHelper = new GpsHelper(_context, _locationText, _addressText, this);
+            _gpsHelper = new GpsHelper(_context, _locationText, _addressText, _gpsState, this);
 
             AdoFunctionsHelper.CreateDatabase(_context);
             NetworkHelper.DetectNetwork(_context, _isOnline, _connectionType, _wifi, _roaming);
@@ -99,11 +103,25 @@ namespace SaveMe
         #endregion
 
         private void Start()
-        {            
-            _sensorHelper.Start();
-            _gpsHelper.InitializeLocationManager();            
-            _gsmHelper.Start();            
-            //TODO stop if started (toggle)
+        {
+            if (_started == false)
+            {
+                _sensorHelper.Start();
+                _gpsHelper.InitializeLocationManager();
+                _gsmHelper.Start();
+                _button.Text = "STOP";
+                _started = true;
+                Toast.MakeText(_context, "Enabled sensors", ToastLength.Long).Show();
+            }
+            else
+            {
+                _sensorHelper.Pause();
+                _gpsHelper.DisableLocationManager();
+                _gsmHelper.Stop();
+                _button.Text = "START";
+                _started = false;
+                Toast.MakeText(_context, "Disabled sensors", ToastLength.Long).Show();
+            }
         }
 
         #region ISensorEventListener
@@ -140,22 +158,23 @@ namespace SaveMe
         #region ILocationListener
         public void OnLocationChanged(Location location)
         {
-            ;
+            _gpsHelper.OnLocationChanged(location);
         }
 
         public void OnProviderDisabled(string provider)
         {
-            ;
+            _gpsHelper.OnStatusChanged(provider, false);
         }
 
         public void OnProviderEnabled(string provider)
         {
-            ;
+            _gpsHelper.OnStatusChanged(provider, true);
         }
 
         public void OnStatusChanged(string provider, Availability status, Bundle extras)
         {
-            ;
+            Toast.MakeText(_context, provider + " OnStatusChanged " + provider + " " + status.ToString(), ToastLength.Long).Show();
+            _gpsHelper.OnStatusChanged(provider, status == Availability.Available);
         }
         #endregion        
     }

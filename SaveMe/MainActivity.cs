@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Timers;
 using Android.App;
 using Android.Content;
 using Android.Content.PM;
@@ -29,10 +30,15 @@ namespace SaveMe
     {
         #region private fields
 
+        private const int MotionLessChangingPicks = 10; //temp hardocoded
+        private int _motionlessCounter;
+        private List<float> _accLastValues = new List<float>();
+        private List<float> _girLastValues = new List<float>();
+
         private bool _started = false;
         private Context _context;
 
-        static readonly object _syncLock = new object();
+        static readonly object SyncLock = new object();
 
         private DoubleSensorHelper _sensorHelper;
         private GpsHelper _gpsHelper;
@@ -107,16 +113,18 @@ namespace SaveMe
             if (_started == false)
             {
                 _sensorHelper.Start();
-                _gpsHelper.InitializeLocationManager();
+                //_gpsHelper.InitializeLocationManager();
                 _gsmHelper.Start();
                 _button.Text = "STOP";
                 _started = true;
                 Toast.MakeText(_context, "Enabled sensors", ToastLength.Long).Show();
+
+                _motionlessCounter = 0;
             }
             else
             {
                 _sensorHelper.Pause();
-                _gpsHelper.DisableLocationManager();
+                //_gpsHelper.DisableLocationManager();
                 _gsmHelper.Stop();
                 _button.Text = "START";
                 _started = false;
@@ -132,16 +140,23 @@ namespace SaveMe
 
         public async void OnSensorChanged(SensorEvent e)
         {
-            lock (_syncLock)
+            lock (SyncLock)
             {
                 if (e.Sensor.Type == SensorType.Accelerometer)
                 {
+                    CheckLastValues(e, ref _accLastValues);
                     _sensorTextViewAcc.Text = $"x={e.Values[0]:f}, y={e.Values[1]:f}, y={e.Values[2]:f}";
                 }
                 if (e.Sensor.Type == SensorType.Gyroscope)
                 {
+                    CheckLastValues(e, ref _girLastValues);
                     _sensorTextViewGir.Text = $"x={e.Values[0]:f}, y={e.Values[1]:f}, y={e.Values[2]:f}";
-                }                
+                }
+
+                if (_motionlessCounter > MotionLessChangingPicks)
+                {
+                    OnMotionLess();
+                }
             }
 
             if (DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") != _lastDateTime)
@@ -150,9 +165,37 @@ namespace SaveMe
                 _lastDateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                 await AdoFunctionsHelper.InsertIntoDb(_sensorTextViewAcc.Text, time, "ACC", _dbok);
                 await AdoFunctionsHelper.InsertIntoDb(_sensorTextViewGir.Text, time, "GYR", _dbok);
-                await AdoFunctionsHelper.InsertIntoDb(_locationText.Text, time, "GPS", _dbok);               
+                //await AdoFunctionsHelper.InsertIntoDb(_locationText.Text, time, "GPS", _dbok);               
             }
         }
+
+        private void CheckLastValues(SensorEvent e, ref List<float> lastValues)
+        {
+            if (DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") != _lastDateTime) //once per second
+            {
+                bool motionDetect = false;
+                for (int i = 0; i < 3; i++)
+                {
+                    if (lastValues.Any())
+                    {
+                        Log.Info("SaveMe ", $"LV : {lastValues[i]} | EV : {e.Values[i]}");
+                    }
+
+                    if (lastValues.Any() && (lastValues[i] - e.Values[i]) > 0.5)
+                    {                        
+                        motionDetect = true;
+                        _motionlessCounter = 0;
+                    }
+                }
+                if (motionDetect == false)
+                {
+                    _motionlessCounter ++;
+                }
+                lastValues = new List<float>();
+                lastValues.AddRange(e.Values);
+            }
+        }
+
         #endregion
 
         #region ILocationListener
@@ -176,7 +219,14 @@ namespace SaveMe
             Toast.MakeText(_context, provider + " OnStatusChanged " + provider + " " + status.ToString(), ToastLength.Long).Show();
             _gpsHelper.OnStatusChanged(provider, status == Availability.Available);
         }
-        #endregion        
+        #endregion
+
+        private void OnMotionLess()
+        {
+            //TODO send SMS and ring alert
+            //Toast.MakeText(_context, "OnMotionLess", ToastLength.Long).Show();
+            Log.Info("SaveMe ", "OnMotionLess");
+        }
     }
 }
 
